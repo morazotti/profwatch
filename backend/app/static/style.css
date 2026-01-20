@@ -244,6 +244,15 @@ body {
   text-decoration: underline;
 }
 
+/* Instructions */
+.instructions {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
 /* Status Badges */
 .status-badge {
   display: inline-block;
@@ -279,10 +288,25 @@ body {
   letter-spacing: 0.02em;
 }
 
-.university-usp { background: #f59e0b22; color: #f59e0b; }
-.university-unicamp { background: #06b6d422; color: #06b6d4; }
-.university-unesp { background: #a855f722; color: #a855f7; }
-.university-ufscar { background: #22c55e22; color: #22c55e; }
+.university-usp {
+  background: #f59e0b22;
+  color: #f59e0b;
+}
+
+.university-unicamp {
+  background: #06b6d422;
+  color: #06b6d4;
+}
+
+.university-unesp {
+  background: #a855f722;
+  color: #a855f7;
+}
+
+.university-ufscar {
+  background: #22c55e22;
+  color: #22c55e;
+}
 
 /* Loading State */
 .loading {
@@ -305,7 +329,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */

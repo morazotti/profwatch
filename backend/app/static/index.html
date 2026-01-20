@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
   <header class="header">
     <h1>🎓 ProfWatch</h1>
@@ -93,7 +95,7 @@
             <th data-sort="status" onclick="sortBy('status')">
               Situação <span class="sort-icon">↕</span>
             </th>
-            <th>Link</th>
+            <th>Como Acessar</th>
           </tr>
         </thead>
         <tbody id="jobs-body">
@@ -155,14 +157,14 @@
     // Update statistics
     function updateStats() {
       document.getElementById('total-jobs').textContent = allJobs.length;
-      document.getElementById('total-universities').textContent = 
+      document.getElementById('total-universities').textContent =
         new Set(allJobs.map(j => j.universidade)).size;
-      document.getElementById('open-jobs').textContent = 
-        allJobs.filter(j => 
-          j.status?.toLowerCase().includes('aberto') || 
+      document.getElementById('open-jobs').textContent =
+        allJobs.filter(j =>
+          j.status?.toLowerCase().includes('aberto') ||
           j.status?.toLowerCase().includes('inscrições')
         ).length;
-      document.getElementById('last-update').textContent = 
+      document.getElementById('last-update').textContent =
         new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
 
@@ -179,22 +181,22 @@
         const statusLower = (job.status || '').toLowerCase();
 
         if (universidade && job.universidade !== universidade) return false;
-        
+
         if (tipo) {
           if (tipo === 'substituto' && !tituloLower.includes('substitut')) return false;
           if (tipo === 'efetivo' && !tituloLower.includes('efetivo') && !tituloLower.includes('assistente')) return false;
           if (tipo === 'titular' && !tituloLower.includes('titular')) return false;
           if (tipo === 'livre-docente' && !tituloLower.includes('livre-doc')) return false;
         }
-        
+
         if (area && !areaLower.includes(area) && !tituloLower.includes(area)) return false;
-        
+
         if (status) {
           if (status === 'aberto' && !statusLower.includes('aberto')) return false;
           if (status === 'andamento' && !statusLower.includes('andamento')) return false;
           if (status === 'inscricoes' && !statusLower.includes('inscrições')) return false;
         }
-        
+
         return true;
       });
 
@@ -210,20 +212,20 @@
         currentSort.field = field;
         currentSort.asc = true;
       }
-      
+
       // Update UI
       document.querySelectorAll('.jobs-table th').forEach(th => {
         th.classList.remove('sorted');
         const icon = th.querySelector('.sort-icon');
         if (icon) icon.textContent = '↕';
       });
-      
+
       const th = document.querySelector(`[data-sort="${field}"]`);
       if (th) {
         th.classList.add('sorted');
         th.querySelector('.sort-icon').textContent = currentSort.asc ? '↑' : '↓';
       }
-      
+
       sortJobs();
     }
 
@@ -231,15 +233,15 @@
       filteredJobs.sort((a, b) => {
         let valA = a[currentSort.field] || '';
         let valB = b[currentSort.field] || '';
-        
+
         if (typeof valA === 'string') valA = valA.toLowerCase();
         if (typeof valB === 'string') valB = valB.toLowerCase();
-        
+
         if (valA < valB) return currentSort.asc ? -1 : 1;
         if (valA > valB) return currentSort.asc ? 1 : -1;
         return 0;
       });
-      
+
       renderJobs();
     }
 
@@ -274,8 +276,11 @@
             <span class="status-badge status-${getStatusClass(job.status)}">${escapeHtml(job.status || 'N/A')}</span>
           </td>
           <td>
+            <span class="instructions" title="${escapeHtml(job.instrucoes || '')}">
+              ${escapeHtml(job.instrucoes || 'Acessar site da universidade')}
+            </span>
             <a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" class="job-link">
-              Ver edital →
+              Abrir →
             </a>
           </td>
         </tr>
@@ -288,7 +293,7 @@
     function renderPagination() {
       const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
       const pagination = document.getElementById('pagination');
-      
+
       if (totalPages <= 1) {
         pagination.innerHTML = '';
         return;
@@ -297,7 +302,7 @@
       let html = `
         <button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Anterior</button>
       `;
-      
+
       for (let i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
           html += `<button onclick="goToPage(${i})" class="${i === currentPage ? 'current' : ''}">${i}</button>`;
@@ -305,11 +310,11 @@
           html += `<span>...</span>`;
         }
       }
-      
+
       html += `
         <button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Próxima →</button>
       `;
-      
+
       pagination.innerHTML = html;
     }
 
@@ -364,4 +369,5 @@
     fetchJobs();
   </script>
 </body>
+
 </html>
