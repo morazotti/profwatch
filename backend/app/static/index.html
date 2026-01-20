@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ProfWatch - Monitoramento de concursos para docentes em universidades brasileiras">
+  <title>ProfWatch - Vagas para Docentes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>🎓 ProfWatch</h1>
+    <p>Monitoramento de concursos para docentes em universidades brasileiras</p>
+  </header>
+
+  <main class="container">
+    <!-- Stats Bar -->
+    <section class="stats-bar">
+      <div class="stat-card">
+        <div class="number" id="total-jobs">-</div>
+        <div class="label">Total de Vagas</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="total-universities">-</div>
+        <div class="label">Universidades</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="open-jobs">-</div>
+        <div class="label">Inscrições Abertas</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="last-update">-</div>
+        <div class="label">Última Atualização</div>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters-section">
+      <h2 class="filters-title">
+        <span>🔍</span> Filtros
+      </h2>
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label for="filter-universidade">Universidade</label>
+          <select id="filter-universidade">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-tipo">Tipo</label>
+          <select id="filter-tipo">
+            <option value="">Todos</option>
+            <option value="substituto">Professor Substituto</option>
+            <option value="efetivo">Professor Efetivo/Assistente</option>
+            <option value="titular">Professor Titular</option>
+            <option value="livre-docente">Livre-Docente</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-area">Área do Conhecimento</label>
+          <input type="text" id="filter-area" placeholder="Ex: Medicina, Engenharia...">
+        </div>
+        <div class="filter-group">
+          <label for="filter-status">Situação</label>
+          <select id="filter-status">
+            <option value="">Todas</option>
+            <option value="aberto">Aberto</option>
+            <option value="andamento">Em Andamento</option>
+            <option value="inscricoes">Inscrições Abertas</option>
+          </select>
+        </div>
+      </div>
+      <button class="clear-filters" onclick="clearFilters()">Limpar Filtros</button>
+    </section>
+
+    <!-- Jobs Table -->
+    <section class="jobs-table-container">
+      <table class="jobs-table">
+        <thead>
+          <tr>
+            <th data-sort="universidade" onclick="sortBy('universidade')">
+              Universidade <span class="sort-icon">↕</span>
+            </th>
+            <th data-sort="titulo" onclick="sortBy('titulo')">
+              Título <span class="sort-icon">↕</span>
+            </th>
+            <th data-sort="area" onclick="sortBy('area')">
+              Área <span class="sort-icon">↕</span>
+            </th>
+            <th data-sort="status" onclick="sortBy('status')">
+              Situação <span class="sort-icon">↕</span>
+            </th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody id="jobs-body">
+          <tr>
+            <td colspan="5">
+              <div class="loading">Carregando vagas</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+  </main>
+
+  <script>
+    // State
+    let allJobs = [];
+    let filteredJobs = [];
+    let currentSort = { field: 'universidade', asc: true };
+    let currentPage = 1;
+    const itemsPerPage = 20;
+
+    // Fetch jobs on load
+    async function fetchJobs() {
+      try {
+        const response = await fetch('/scrape');
+        allJobs = await response.json();
+        filteredJobs = [...allJobs];
+        populateFilters();
+        updateStats();
+        applyFilters();
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+        document.getElementById('jobs-body').innerHTML = `
+          <tr><td colspan="5">
+            <div class="empty-state">
+              <h3>Erro ao carregar vagas</h3>
+              <p>Tente novamente mais tarde.</p>
+            </div>
+          </td></tr>
+        `;
+      }
+    }
+
+    // Populate filter dropdowns
+    function populateFilters() {
+      const universities = [...new Set(allJobs.map(j => j.universidade))].sort();
+      const select = document.getElementById('filter-universidade');
+      universities.forEach(uni => {
+        const option = document.createElement('option');
+        option.value = uni;
+        option.textContent = uni;
+        select.appendChild(option);
+      });
+    }
+
+    // Update statistics
+    function updateStats() {
+      document.getElementById('total-jobs').textContent = allJobs.length;
+      document.getElementById('total-universities').textContent = 
+        new Set(allJobs.map(j => j.universidade)).size;
+      document.getElementById('open-jobs').textContent = 
+        allJobs.filter(j => 
+          j.status?.toLowerCase().includes('aberto') || 
+          j.status?.toLowerCase().includes('inscrições')
+        ).length;
+      document.getElementById('last-update').textContent = 
+        new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Apply filters
+    function applyFilters() {
+      const universidade = document.getElementById('filter-universidade').value;
+      const tipo = document.getElementById('filter-tipo').value.toLowerCase();
+      const area = document.getElementById('filter-area').value.toLowerCase();
+      const status = document.getElementById('filter-status').value.toLowerCase();
+
+      filteredJobs = allJobs.filter(job => {
+        const tituloLower = (job.titulo || '').toLowerCase();
+        const areaLower = (job.area || '').toLowerCase();
+        const statusLower = (job.status || '').toLowerCase();
+
+        if (universidade && job.universidade !== universidade) return false;
+        
+        if (tipo) {
+          if (tipo === 'substituto' && !tituloLower.includes('substitut')) return false;
+          if (tipo === 'efetivo' && !tituloLower.includes('efetivo') && !tituloLower.includes('assistente')) return false;
+          if (tipo === 'titular' && !tituloLower.includes('titular')) return false;
+          if (tipo === 'livre-docente' && !tituloLower.includes('livre-doc')) return false;
+        }
+        
+        if (area && !areaLower.includes(area) && !tituloLower.includes(area)) return false;
+        
+        if (status) {
+          if (status === 'aberto' && !statusLower.includes('aberto')) return false;
+          if (status === 'andamento' && !statusLower.includes('andamento')) return false;
+          if (status === 'inscricoes' && !statusLower.includes('inscrições')) return false;
+        }
+        
+        return true;
+      });
+
+      currentPage = 1;
+      sortJobs();
+    }
+
+    // Sort jobs
+    function sortBy(field) {
+      if (currentSort.field === field) {
+        currentSort.asc = !currentSort.asc;
+      } else {
+        currentSort.field = field;
+        currentSort.asc = true;
+      }
+      
+      // Update UI
+      document.querySelectorAll('.jobs-table th').forEach(th => {
+        th.classList.remove('sorted');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) icon.textContent = '↕';
+      });
+      
+      const th = document.querySelector(`[data-sort="${field}"]`);
+      if (th) {
+        th.classList.add('sorted');
+        th.querySelector('.sort-icon').textContent = currentSort.asc ? '↑' : '↓';
+      }
+      
+      sortJobs();
+    }
+
+    function sortJobs() {
+      filteredJobs.sort((a, b) => {
+        let valA = a[currentSort.field] || '';
+        let valB = b[currentSort.field] || '';
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return currentSort.asc ? -1 : 1;
+        if (valA > valB) return currentSort.asc ? 1 : -1;
+        return 0;
+      });
+      
+      renderJobs();
+    }
+
+    // Render jobs table
+    function renderJobs() {
+      const tbody = document.getElementById('jobs-body');
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const jobsToShow = filteredJobs.slice(start, end);
+
+      if (jobsToShow.length === 0) {
+        tbody.innerHTML = `
+          <tr><td colspan="5">
+            <div class="empty-state">
+              <h3>Nenhuma vaga encontrada</h3>
+              <p>Tente ajustar os filtros.</p>
+            </div>
+          </td></tr>
+        `;
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      tbody.innerHTML = jobsToShow.map(job => `
+        <tr>
+          <td>
+            <span class="university-tag university-${job.universidade.toLowerCase()}">${job.universidade}</span>
+          </td>
+          <td>${escapeHtml(job.titulo || '-')}</td>
+          <td>${escapeHtml(job.area || '-')}</td>
+          <td>
+            <span class="status-badge status-${getStatusClass(job.status)}">${escapeHtml(job.status || 'N/A')}</span>
+          </td>
+          <td>
+            <a href="${escapeHtml(job.link)}" target="_blank" rel="noopener" class="job-link">
+              Ver edital →
+            </a>
+          </td>
+        </tr>
+      `).join('');
+
+      renderPagination();
+    }
+
+    // Render pagination
+    function renderPagination() {
+      const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+      const pagination = document.getElementById('pagination');
+      
+      if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      let html = `
+        <button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Anterior</button>
+      `;
+      
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `<button onclick="goToPage(${i})" class="${i === currentPage ? 'current' : ''}">${i}</button>`;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += `<span>...</span>`;
+        }
+      }
+      
+      html += `
+        <button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Próxima →</button>
+      `;
+      
+      pagination.innerHTML = html;
+    }
+
+    function goToPage(page) {
+      const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderJobs();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Clear filters
+    function clearFilters() {
+      document.getElementById('filter-universidade').value = '';
+      document.getElementById('filter-tipo').value = '';
+      document.getElementById('filter-area').value = '';
+      document.getElementById('filter-status').value = '';
+      applyFilters();
+    }
+
+    // Helpers
+    function getStatusClass(status) {
+      if (!status) return 'aberto';
+      const s = status.toLowerCase();
+      if (s.includes('andamento')) return 'andamento';
+      if (s.includes('inscrições')) return 'inscricoes';
+      return 'aberto';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Event listeners
+    document.getElementById('filter-universidade').addEventListener('change', applyFilters);
+    document.getElementById('filter-tipo').addEventListener('change', applyFilters);
+    document.getElementById('filter-area').addEventListener('input', debounce(applyFilters, 300));
+    document.getElementById('filter-status').addEventListener('change', applyFilters);
+
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // Initialize
+    fetchJobs();
+  </script>
+</body>
+</html>
