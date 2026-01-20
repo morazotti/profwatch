@@ -7,6 +7,7 @@ class Job(BaseModel):
     titulo: str
     area: Optional[str] = None
     link: str
+    instrucoes: Optional[str] = None  # Navigation instructions to reach the job posting
     data_publicacao: Optional[str] = None
     data_encerramento: Optional[str] = None
     status: Optional[str] = None

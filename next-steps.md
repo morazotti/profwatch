@@ -2,22 +2,24 @@
 
 ## ✅ O que já está rodando (Status Atual)
 - [x] **Automação com Playwright**: Substituição do Selenium por Playwright, permitindo raspagem assíncrona e mais estável.
-- [x] **Scrapers Funcionais**: UNESP e Unicamp estão extraindo vagas com sucesso (testado com ~20 resultados).
+- [x] **Scrapers Funcionais**: Todos os 4 scrapers funcionando!
+  - **USP**: ~20 vagas (jqGrid com seletor `tr.jqgrow`)
+  - **UNICAMP**: ~10 vagas
+  - **UNESP**: ~10 vagas
+  - **UFSCar**: ~10+ vagas (navegação via JS `menu()/submenu()`)
 - [x] **Frontend Moderno**: Interface em `/` com listagem, paginação, modo escuro e filtros dinâmicos.
 - [x] **Backend com Cache**: `main.py` entrega resultados instantâneos usando cache em memória.
 - [x] **Gestão de Dependências**: Migração para `uv` concluída, facilitando a instalação em novos ambientes.
 
 ## 🚀 Próximos Passos (Evolução)
-Aqui estão os próximos passos recomendados para a evolução da ferramenta:
-
 
 ## 1. Refinamento dos Scrapers
-- [ ] **USP**: Investigar o seletor `#inscricao-sitcon`. O site pode estar usando um iframe ou mudando IDs dinamicamente.
-- [ ] **UFSCar**: Ajustar o clique no menu "Em Andamento". Verificar se a navegação por texto puro é estável ou se seletores CSS mais específicos são necessários.
-- [ ] **Qualidade dos Dados**: Melhorar a extração da "Área do Conhecimento", que em alguns casos vem como `null` ou contém texto extra desnecessário.
+- [x] **USP**: ✅ Corrigido! Usa user-agent real e aguarda carregamento do jqGrid.
+- [x] **UFSCar**: ✅ Corrigido! Usa navegação JS e filtra linhas espúrias.
+- [ ] **Qualidade dos Dados**: Melhorar a extração da "Área do Conhecimento", que em alguns casos vem como `null`.
 
 ## 2. Persistência de Dados
-- [ ] **Banco de Dados**: Implementar o uso de **PostgreSQL** ou **SQLite** (via SQLAlchemy) para armazenar as vagas permanentemente. No momento, usamos apenas um cache em memória.
+- [ ] **Banco de Dados**: Implementar o uso de **PostgreSQL** ou **SQLite** (via SQLAlchemy) para armazenar as vagas permanentemente.
 - [ ] **Histórico**: Permitir que o usuário veja vagas que já foram encerradas (arquivamento).
 - [ ] **Diferenciação**: Implementar lógica para identificar vagas novas desde o último scraping e evitar duplicatas.
 

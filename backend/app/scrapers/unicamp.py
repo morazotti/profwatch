@@ -52,6 +52,7 @@ class UnicampScraper(BaseScraper):
                                 titulo=f"Concurso Docente - {unidade.strip()}",
                                 area=area if area else None,
                                 link=self.url,
+                                instrucoes="Acesse sg.unicamp.br/concursos/abertos → Localize o instituto/faculdade → Clique em 'Editais e documentos'",
                                 data_publicacao=inscricao.strip()[:100] if inscricao else None,
                                 status="aberto"
                             ))

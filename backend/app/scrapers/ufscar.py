@@ -13,65 +13,73 @@ class UfscarScraper(BaseScraper):
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
-                args=["--ignore-certificate-errors"]
+                args=[
+                    "--ignore-certificate-errors",
+                    "--disable-blink-features=AutomationControlled",
+                ]
             )
-            context = await browser.new_context(ignore_https_errors=True)
+            context = await browser.new_context(
+                ignore_https_errors=True,
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
             page = await context.new_page()
             
             try:
-                await page.goto(self.url, timeout=60000)
-                await page.wait_for_load_state("networkidle")
-                await page.wait_for_timeout(2000)
+                await page.goto(self.url, timeout=60000, wait_until="domcontentloaded")
+                await page.wait_for_load_state("networkidle", timeout=30000)
+                await page.wait_for_timeout(5000)
                 
-                # Navigate to Em Andamento > Professor Efetivo
-                # The menu uses JavaScript, so click on text
-                andamento_link = page.locator("a").filter(has_text="Em Andamento").first
-                await andamento_link.click(timeout=10000)
-                await page.wait_for_timeout(1000)
+                # Check if menu functions are available
+                menu_available = await page.evaluate("typeof menu === 'function'")
                 
-                # Click on Professor Efetivo
-                efetivo_link = page.locator("a").filter(has_text="Professor Efetivo").first
-                await efetivo_link.click(timeout=10000)
-                await page.wait_for_timeout(1000)
-                
-                # For each campus
-                for campus in self.CAMPUSES:
-                    try:
-                        campus_link = page.locator("a, span").filter(has_text=campus).first
-                        if await campus_link.count() > 0:
-                            await campus_link.click(timeout=5000)
-                            await page.wait_for_timeout(2000)
-                            
-                            # Extract jobs from table
-                            jobs.extend(await self._extract_jobs_from_table(page, campus))
-                    except Exception:
-                        continue
-                
-                # Also try Professor Substituto
-                try:
-                    await page.goto(self.url, timeout=30000)
+                if menu_available:
+                    print("UFSCar: menu function available")
+                    
+                    # Navigate to Em Andamento > Professor Efetivo
+                    await page.evaluate("menu(2)")
+                    await page.wait_for_timeout(1000)
+                    await page.evaluate("submenu(2, 1)")
                     await page.wait_for_timeout(2000)
                     
-                    andamento_link = page.locator("a").filter(has_text="Em Andamento").first
-                    await andamento_link.click(timeout=10000)
-                    await page.wait_for_timeout(1000)
+                    # For each campus
+                    for idx in range(len(self.CAMPUSES)):
+                        try:
+                            await page.evaluate(f"""
+                                (() => {{
+                                    const radios = document.querySelectorAll('input[type="radio"][name="campus"]');
+                                    if (radios.length > {idx}) {{
+                                        radios[{idx}].click();
+                                        // Try to submit form
+                                        const form = radios[{idx}].closest('form');
+                                        if (form) form.submit();
+                                    }}
+                                }})()
+                            """)
+                            await page.wait_for_timeout(3000)
+                            jobs.extend(await self._extract_jobs(page, self.CAMPUSES[idx]))
+                        except Exception:
+                            continue
+                else:
+                    print("UFSCar: menu function NOT available, using clicks")
                     
-                    subst_link = page.locator("a").filter(has_text="Professor Substituto").first
-                    if await subst_link.count() > 0:
-                        await subst_link.click(timeout=10000)
+                    # Click on "Em Andamento" link directly
+                    try:
+                        await page.click("text=Em Andamento", timeout=5000)
+                        await page.wait_for_timeout(1000)
+                        await page.click("text=Professor Efetivo", timeout=5000)
                         await page.wait_for_timeout(2000)
                         
-                        for campus in self.CAMPUSES:
-                            try:
-                                campus_link = page.locator("a, span").filter(has_text=campus).first
-                                if await campus_link.count() > 0:
-                                    await campus_link.click(timeout=5000)
-                                    await page.wait_for_timeout(2000)
-                                    jobs.extend(await self._extract_jobs_from_table(page, campus))
-                            except Exception:
-                                continue
-                except Exception:
-                    pass
+                        # Click first campus radio
+                        radios = await page.query_selector_all("input[type='radio']")
+                        if radios:
+                            await radios[0].click()
+                            await page.wait_for_timeout(2000)
+                            jobs.extend(await self._extract_jobs(page, "São Carlos"))
+                    except Exception as e:
+                        print(f"UFSCar click navigation failed: {e}")
+                
+                print(f"UFSCar: Found {len(jobs)} jobs")
                         
             except Exception as e:
                 print(f"UFSCar scraper error: {e}")
@@ -80,32 +88,54 @@ class UfscarScraper(BaseScraper):
                 
         return jobs
     
-    async def _extract_jobs_from_table(self, page, campus: str) -> List[Job]:
-        """Extract job listings from the currently displayed table."""
+    async def _extract_jobs(self, page, campus: str) -> List[Job]:
+        """Extract job listings from the current page."""
         jobs = []
         
         try:
-            rows = await page.query_selector_all("table tr")
+            rows_data = await page.evaluate("""
+                (() => {
+                    // Find table with job data
+                    const tables = document.querySelectorAll('table');
+                    for (let table of tables) {
+                        const text = table.textContent;
+                        if (text.includes('Código') && text.includes('Departamento')) {
+                            const rows = Array.from(table.querySelectorAll('tr')).slice(1); // Skip header
+                            return rows.map(row => {
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length < 3) return null;
+                                
+                                const link = row.querySelector('a');
+                                const href = link ? link.getAttribute('href') || '' : '';
+                                const match = href.match(/concurso\\((\\d+)\\)/);
+                                
+                                return {
+                                    codigo: cells[0]?.innerText?.trim() || '',
+                                    departamento: cells[1]?.innerText?.trim() || '',
+                                    classe: cells[2]?.innerText?.trim() || '',
+                                    area: cells[3]?.innerText?.trim() || '',
+                                    jobId: match ? match[1] : null
+                                };
+                            }).filter(r => r && r.codigo && !r.codigo.includes('Código') && !r.codigo.includes('Próximos') && !r.departamento.includes('Home'));
+                        }
+                    }
+                    return [];
+                })()
+            """)
             
-            for row in rows:
-                cells = await row.query_selector_all("td")
-                if len(cells) >= 3:
-                    codigo = await cells[0].inner_text()
-                    departamento = await cells[1].inner_text() if len(cells) > 1 else ""
-                    classe = await cells[2].inner_text() if len(cells) > 2 else ""
-                    area = await cells[3].inner_text() if len(cells) > 3 else ""
-                    
-                    # Skip header rows or empty
-                    if not codigo.strip() or "Código" in codigo:
-                        continue
-                    
-                    jobs.append(Job(
-                        universidade=self.universidade,
-                        titulo=f"{classe.strip()} - {departamento.strip()} ({campus})",
-                        area=area.strip() if area.strip() else None,
-                        link=self.url,
-                        status="Em Andamento"
-                    ))
+            for row in rows_data:
+                title = f"{row['classe']} - {row['departamento']} ({campus})"
+                # Always use base URL - detail links have SSL issues
+                link = self.url
+                
+                jobs.append(Job(
+                    universidade=self.universidade,
+                    titulo=title,
+                    area=row.get('area') if row.get('area') else None,
+                    link=link,
+                    instrucoes=f"Acesse concursos.ufscar.br → Em Andamento → Professor Efetivo/Substituto → Selecione campus '{campus}'",
+                    status="Em Andamento"
+                ))
         except Exception:
             pass
             

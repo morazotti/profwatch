@@ -67,7 +67,8 @@ class UnespScraper(BaseScraper):
                                     universidade=self.universidade,
                                     titulo=titulo.strip()[:200],
                                     area=None,
-                                    link=link,
+                                    link=self.url,
+                                    instrucoes="Acesse inscricoes.unesp.br/concurso/inscricao-aberta → Localize o campus e edital desejado",
                                     status="aberto"
                                 ))
                     except Exception:
